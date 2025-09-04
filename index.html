@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Astro Meteo Check</title>
+<style>
+  body { font-family: Arial, sans-serif; background:#0b1522; color:#eee; margin:0; padding:20px; }
+  h1 { color:#ffd479; }
+  label { display:block; margin-top:12px; }
+  input { width:100%; padding:6px; margin-top:4px; border-radius:6px; border:1px solid #444; background:#111; color:#eee; }
+  button { margin-top:16px; padding:10px 16px; border:none; border-radius:6px; cursor:pointer; font-weight:bold; }
+  button.analyze { background:#ffd479; color:#111; }
+  .result { margin-top:20px; padding:15px; border-radius:8px; font-size:1.2em; }
+  .good { background:#2d6a4f; }
+  .ok { background:#386641; }
+  .warn { background:#b08900; }
+  .bad { background:#9d0208; }
+</style>
+</head>
+<body>
+<h1>Astro Meteo Check</h1>
+<p>Inserisci i dati atmosferici per sapere se conviene osservare con il telescopio.</p>
+
+<form id="astroForm">
+  <label>Temperatura (°C) <input type="number" id="temp" required></label>
+  <label>Pressione (hPa) <input type="number" id="pressure" required></label>
+  <label>Umidità (%) <input type="number" id="humidity" required></label>
+  <label>Vento (km/h) <input type="number" id="wind" required></label>
+  <label>Nuvole (%) <input type="number" id="clouds" required></label>
+  <label>Fascia oraria prevista <input type="text" id="time" placeholder="es. 21:00-23:00"></label>
+  <button type="submit" class="analyze">Analizza</button>
+</form>
+
+<div id="output" class="result"></div>
+
+<script>
+document.getElementById("astroForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  const t = parseFloat(document.getElementById("temp").value);
+  const p = parseFloat(document.getElementById("pressure").value);
+  const h = parseFloat(document.getElementById("humidity").value);
+  const w = parseFloat(document.getElementById("wind").value);
+  const c = parseFloat(document.getElementById("clouds").value);
+  const time = document.getElementById("time").value || "orario non specificato";
+
+  let score = 0;
+
+  if(w <= 15) score += 2; else if(w <= 25) score += 1;
+  if(c <= 20) score += 3; else if(c <= 40) score += 1;
+  if(h <= 70) score += 2; else if(h <= 85) score += 1;
+  if(p >= 1010) score += 2; else if(p >= 1000) score += 1;
+
+  let msg = "";
+  let cls = "";
+  if(score >= 7){ msg = "🌟 Ideale per osservazioni"; cls="good"; }
+  else if(score >= 5){ msg = "🙂 Possibile, condizioni discrete"; cls="ok"; }
+  else if(score >= 3){ msg = "⚠️ Difficile, condizioni poco favorevoli"; cls="warn"; }
+  else { msg = "❌ Sconsigliata l’osservazione"; cls="bad"; }
+
+  document.getElementById("output").className = "result "+cls;
+  document.getElementById("output").innerHTML = `<strong>${msg}</strong><br>
+    Fascia oraria: ${time}<br>
+    (T=${t}°C, P=${p}hPa, H=${h}%, Vento=${w}km/h, Nuvole=${c}%)`;
+});
+</script>
+</body>
+</html>
