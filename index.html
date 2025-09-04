@@ -2,172 +2,270 @@
 <html lang="it">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Astro Meteo Check</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
 <style>
-  body {
+  :root{
+    --glass: rgba(255,255,255,0.06);
+    --grad1:#ffb347;
+    --grad2:#ffcc33;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
     margin:0;
-    font-family:'Poppins', sans-serif;
-    height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    background:#000;
-    overflow:hidden;
+    font-family:'Poppins', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background:#000; /* fallback */
     color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
   }
-  canvas {
-    position:absolute;
-    top:0; left:0;
-    width:100%; height:100%;
-    z-index:0;
+
+  /* canvas stelle sotto a tutto, non intercetta i click */
+  canvas#stars{
+    position:fixed; inset:0; width:100%; height:100%;
+    z-index:0; pointer-events:none;
   }
-  .card {
-    position:relative;
-    z-index:1;
-    background:rgba(255,255,255,0.05);
-    backdrop-filter:blur(10px);
-    padding:40px;
+  /* leggera sfumatura radiale per profondità */
+  .vignette{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(1200px 800px at 50% 30%, rgba(60,80,150,0.25), transparent 60%),
+      radial-gradient(900px 600px at 20% 80%, rgba(150,60,140,0.2), transparent 60%);
+    mix-blend-mode: screen;
+  }
+
+  .wrap{
+    position:relative; z-index:1;
+    perspective: 900px; /* per effetto 3D */
+    padding:24px; width:100%;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  .card{
+    width:min(92vw, 380px);
+    background: var(--glass);
+    backdrop-filter: blur(14px) saturate(120%);
+    -webkit-backdrop-filter: blur(14px) saturate(120%);
+    border:1px solid rgba(255,255,255,0.08);
     border-radius:20px;
+    padding:28px 24px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
     text-align:center;
-    box-shadow:0 8px 25px rgba(0,0,0,0.6);
-    transform: perspective(800px) rotateX(3deg);
-    animation: fadeIn 1.2s ease;
-    width:320px;
+    transform: rotateX(0deg) rotateY(0deg) translateZ(0);
+    transition: transform .12s ease-out, box-shadow .2s ease-out;
+    animation: fadeIn .9s ease both;
   }
-  .card h1 {
-    font-weight:700;
-    font-size:1.8rem;
-    margin-bottom:20px;
-    background: linear-gradient(90deg,#ffb347,#ffcc33);
-    -webkit-background-clip:text;
+  .card:hover{ box-shadow: 0 28px 70px rgba(0,0,0,0.7); }
+
+  h1{
+    margin:0 0 18px;
+    font-weight:700; font-size:1.9rem; letter-spacing:.3px;
+    background: linear-gradient(90deg, var(--grad1), var(--grad2));
+    -webkit-background-clip:text; background-clip:text;
     -webkit-text-fill-color:transparent;
   }
-  form {
-    display:flex;
-    flex-direction:column;
-    gap:12px;
+  p.subtitle{margin:0 0 20px; color:rgba(255,255,255,0.75); font-weight:300; font-size:.98rem}
+
+  form{
+    display:flex; flex-direction:column; gap:10px; text-align:left;
   }
-  input {
-    padding:10px;
-    border:none;
-    border-radius:10px;
-    font-size:1rem;
-    text-align:center;
-    background:rgba(255,255,255,0.1);
-    color:#fff;
-    outline:none;
+  label{font-size:.9rem; color:rgba(255,255,255,0.85)}
+  input{
+    width:100%; padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,0.1);
+    background:rgba(255,255,255,0.10); color:#fff; outline:none; font-size:1rem; text-align:center;
   }
-  input::placeholder {
-    color:rgba(255,255,255,0.6);
+  input::placeholder{ color:rgba(255,255,255,0.65) }
+  button{
+    margin-top:6px; padding:12px 16px; border:0; border-radius:12px; cursor:pointer;
+    background: linear-gradient(90deg, var(--grad1), var(--grad2)); color:#111; font-weight:700; font-size:1rem;
   }
-  button {
-    padding:12px;
-    border:none;
-    border-radius:10px;
-    font-size:1rem;
-    font-weight:600;
-    cursor:pointer;
-    background: linear-gradient(90deg,#ffb347,#ffcc33);
-    color:#111;
-    margin-top:10px;
+
+  .result{
+    margin-top:16px; padding:14px; border-radius:12px; font-weight:600; text-align:center;
+    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.08);
   }
-  .result {
-    margin-top:20px;
-    padding:15px;
-    border-radius:10px;
-    font-size:1.1rem;
-    font-weight:500;
+  .good{ background:#2d6a4f; }
+  .ok{   background:#386641; }
+  .warn{ background:#b08900; }
+  .bad{  background:#9d0208; }
+  .err{  background:#7a0c0c; }
+
+  small.hint{ display:block; margin-top:8px; color:rgba(255,255,255,0.7) }
+
+  @keyframes fadeIn{
+    from{opacity:0; transform: translateY(18px) scale(.98)}
+    to{opacity:1; transform: translateY(0) scale(1)}
   }
-  .good { background:#2d6a4f; }
-  .ok { background:#386641; }
-  .warn { background:#b08900; }
-  .bad { background:#9d0208; }
-  @keyframes fadeIn {
-    from { opacity:0; transform: translateY(30px) scale(0.9); }
-    to { opacity:1; transform: translateY(0) scale(1); }
+
+  @media (max-width:420px){
+    h1{font-size:1.7rem}
   }
 </style>
 </head>
 <body>
-<canvas id="stars"></canvas>
 
-<div class="card">
-  <h1>Astro Meteo</h1>
-  <form id="astroForm">
-    <input type="number" id="temp" placeholder="Temperatura °C" required>
-    <input type="number" id="pressure" placeholder="Pressione hPa" required>
-    <input type="number" id="humidity" placeholder="Umidità %" required>
-    <input type="number" id="wind" placeholder="Vento km/h" required>
-    <input type="number" id="clouds" placeholder="Nuvole %" required>
-    <button type="submit">Analizza</button>
-  </form>
-  <div id="output" class="result"></div>
+<canvas id="stars"></canvas>
+<div class="vignette" aria-hidden="true"></div>
+
+<div class="wrap">
+  <section class="card" id="tiltCard" aria-live="polite">
+    <h1>Astro Meteo</h1>
+    <p class="subtitle">Inserisci i dati e scopri se la serata è buona per osservare ✨</p>
+
+    <form id="astroForm" novalidate>
+      <label>Temperatura (°C)
+        <input type="number" id="temp" placeholder="es. 14" step="0.1" inputmode="decimal" required>
+      </label>
+      <label>Pressione (hPa)
+        <input type="number" id="pressure" placeholder="es.
+          1015" step="0.1" inputmode="decimal" required>
+      </label>
+      <label>Umidità (%)
+        <input type="number" id="humidity" placeholder="es. 60" step="1" required>
+      </label>
+      <label>Vento (km/h)
+        <input type="number" id="wind" placeholder="es. 5" step="0.1" inputmode="decimal" required>
+      </label>
+      <label>Nuvole (%)
+        <input type="number" id="clouds" placeholder="es. 15" step="1" required>
+      </label>
+
+      <button type="submit">Analizza</button>
+      <small class="hint">Consiglio: vento < 15 km/h, nuvole < 20%, umidità < 70%, pressione ≥ 1010 hPa.</small>
+    </form>
+
+    <div id="output" class="result" style="display:none"></div>
+  </section>
 </div>
 
 <script>
-// Sfondo stellare animato
-const canvas = document.getElementById("stars");
-const ctx = canvas.getContext("2d");
-let stars = [];
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-window.addEventListener("resize", resize);
-resize();
-function initStars() {
-  stars = [];
-  for (let i=0; i<150; i++) {
-    stars.push({
-      x: Math.random()*canvas.width,
-      y: Math.random()*canvas.height,
-      size: Math.random()*2,
-      speed: 0.2 + Math.random()*0.5
-    });
-  }
-}
-function animateStars() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle = "white";
-  stars.forEach(star => {
-    ctx.beginPath();
-    ctx.arc(star.x, star.y, star.size, 0, Math.PI*2);
-    ctx.fill();
-    star.y += star.speed;
-    if(star.y > canvas.height) {
-      star.y = 0;
-      star.x = Math.random()*canvas.width;
-    }
-  });
-  requestAnimationFrame(animateStars);
-}
-initStars();
-animateStars();
+/* ====== STARFIELD ANIMATO (robusto + retina) ====== */
+(function(){
+  const canvas = document.getElementById('stars');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+  let w=0, h=0, DPR = Math.min(window.devicePixelRatio || 1, 2);
 
-// Analisi condizioni
-document.getElementById("astroForm").addEventListener("submit", e=>{
-  e.preventDefault();
-  const t = parseFloat(document.getElementById("temp").value);
-  const p = parseFloat(document.getElementById("pressure").value);
-  const h = parseFloat(document.getElementById("humidity").value);
-  const w = parseFloat(document.getElementById("wind").value);
-  const c = parseFloat(document.getElementById("clouds").value);
-  let score = 0;
-  if(w <= 15) score += 2; else if(w <= 25) score += 1;
-  if(c <= 20) score += 3; else if(c <= 40) score += 1;
-  if(h <= 70) score += 2; else if(h <= 85) score += 1;
-  if(p >= 1010) score += 2; else if(p >= 1000) score += 1;
-  let msg="", cls="";
-  if(score >= 7){ msg="🌟 Ideale per osservazioni"; cls="good"; }
-  else if(score >= 5){ msg="🙂 Possibile, condizioni discrete"; cls="ok"; }
-  else if(score >= 3){ msg="⚠️ Difficile, condizioni poco favorevoli"; cls="warn"; }
-  else { msg="❌ Sconsigliata l’osservazione"; cls="bad"; }
-  const out = document.getElementById("output");
-  out.className = "result "+cls;
-  out.innerHTML = msg + <br><small>(T=${t}°C, P=${p}hPa, H=${h}%, Vento=${w}km/h, Nuvole=${c}%)</small>;
-});
+  function resize(){
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    canvas.width = Math.floor(w * DPR);
+    canvas.height = Math.floor(h * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0); // coord in px CSS
+    initStars();
+  }
+
+  function initStars(){
+    const count = Math.max(120, Math.floor((w*h)/9000)); // densità proporzionale
+    stars = [];
+    for(let i=0;i<count;i++){
+      stars.push({
+        x: Math.random()*w,
+        y: Math.random()*h,
+        r: Math.random()*1.8 + 0.2,     // raggio
+        s: 0.15 + Math.random()*0.6,    // velocità
+        t: Math.random()*Math.PI*2      // fase per twinkle
+      });
+    }
+  }
+
+  function tick(){
+    ctx.clearRect(0,0,w,h);
+    for(const st of stars){
+      st.y += st.s;              // scivola verso il basso
+      st.t += 0.02;              // twinkle
+      if(st.y > h) { st.y = -2; st.x = Math.random()*w; }
+      const alpha = 0.6 + 0.4*Math.sin(st.t);
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(st.x, st.y, st.r, 0, Math.PI*2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(tick);
+  }
+
+  window.addEventListener('resize', resize, {passive:true});
+  resize();
+  tick();
+})();
+
+/* ====== EFFETTO 3D TILT SULLA CARD ====== */
+(function(){
+  const card = document.getElementById('tiltCard');
+  const maxTilt = 8; // gradi
+  function onMove(e){
+    const rect = card.getBoundingClientRect();
+    const cx = rect.left + rect.width/2;
+    const cy = rect.top + rect.height/2;
+    const x = ( (e.clientX || (e.touches && e.touches[0].clientX)) - cx ) / (rect.width/2);
+    const y = ( (e.clientY || (e.touches && e.touches[0].clientY)) - cy ) / (rect.height/2);
+    const rotY = (x * maxTilt);
+    const rotX = (-y * maxTilt);
+    card.style.transform = rotateX(${rotX}deg) rotateY(${rotY}deg) translateZ(0);
+  }
+  function reset(){ card.style.transform = 'rotateX(0deg) rotateY(0deg) translateZ(0)'; }
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseleave', reset);
+  window.addEventListener('touchmove', onMove, {passive:true});
+  window.addEventListener('touchend', reset);
+})();
+
+/* ====== ANALISI CON VALIDAZIONE ROBUSTA ====== */
+(function(){
+  const form = document.getElementById('astroForm');
+  const out  = document.getElementById('output');
+
+  function toNum(id){
+    const v = document.getElementById(id).value.replace(',', '.'); // supporto virgola
+    return Number(v);
+  }
+
+  form.addEventListener('submit', (e)=>{
+    e.preventDefault();
+
+    const t = toNum('temp');
+    const p = toNum('pressure');
+    const h = toNum('humidity');
+    const w = toNum('wind');
+    const c = toNum('clouds');
+
+    // validazione
+    if (![t,p,h,w,c].every(Number.isFinite)) {
+      out.style.display = 'block';
+      out.className = 'result err';
+      out.textContent = 'Controlla i campi: inserisci numeri validi (usa punto o virgola).';
+      return;
+    }
+
+    let score = 0;
+    // vento (<= km/h)
+    if (w <= 15) score += 2; else if (w <= 25) score += 1;
+    // nuvole (%)
+    if (c <= 20) score += 3; else if (c <= 40) score += 1;
+    // umidità (%)
+    if (h <= 70) score += 2; else if (h <= 85) score += 1;
+    // pressione (hPa)
+    if (p >= 1010) score += 2; else if (p >= 1000) score += 1;
+
+    let msg = '', cls='';
+    if (score >= 7){ msg='🌟 Ideale per osservazioni'; cls='good'; }
+    else if (score >= 5){ msg='🙂 Possibile, condizioni discrete'; cls='ok'; }
+    else if (score >= 3){ msg='⚠️ Difficile, condizioni poco favorevoli'; cls='warn'; }
+    else { msg='❌ Sconsigliata l’osservazione'; cls='bad'; }
+
+    out.style.display = 'block';
+    out.className = 'result '+cls;
+    out.innerHTML = `${msg}<br>
+      <small>(T=${t}°C, P=${p} hPa, H=${h}%, V=${w} km/h, Nuvole=${c}%)</small>`;
+  });
+})();
 </script>
 </body>
 </html>
